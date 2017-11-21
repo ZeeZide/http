@@ -405,7 +405,7 @@ fileprivate extension DispatchData {
 }
 
 #if swift(>=4.0) // so much copying w/o macros ;->
-  fileprivate extension FixedWidthInteger {
+  fileprivate extension Int { // could be FixedWidthInteger, no gain, X issues
 
     var chunkLenDispatchData : DispatchData {
       // thanks go to @regexident
