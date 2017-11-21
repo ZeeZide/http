@@ -404,48 +404,46 @@ fileprivate extension DispatchData {
   
 }
 
-#if swift(>=3.2)
+#if swift(>=4.0) // so much copying w/o macros ;->
+  fileprivate extension FixedWidthInteger {
 
-fileprivate extension FixedWidthInteger {
+    var chunkLenDispatchData : DispatchData {
+      // thanks go to @regexident
+      var bigEndian = self.bigEndian
   
-  var chunkLenDispatchData : DispatchData {
-    // thanks go to @regexident
-    var bigEndian = self.bigEndian
+      return Swift.withUnsafeBytes(of: &bigEndian) { bp in
+        let maxlen = bitWidth / 8 * 2
+        let cstr   = UnsafeMutablePointer<UInt8>.allocate(capacity: maxlen + 3)
+        var idx    = 0
     
-    return Swift.withUnsafeBytes(of: &bigEndian) { bp in
-      let maxlen = bitWidth / 8 * 2
-      let cstr   = UnsafeMutablePointer<UInt8>.allocate(capacity: maxlen + 3)
-      var idx    = 0
+        for byte in bp {
+          if idx == 0 && byte == 0 { continue }
       
-      for byte in bp {
-        if idx == 0 && byte == 0 { continue }
-        
-        func hexFromNibble(_ nibble: UInt8) -> UInt8 {
-          let cA   : UInt8 = 65
-          let c0   : UInt8 = 48
-          let corr : UInt8 = cA - c0 - 10
-          let c    = nibble + c0
-          let mask : UInt8 = (nibble > 9) ? 0xff : 0x00;
-          return c + (mask & corr)
+          func hexFromNibble(_ nibble: UInt8) -> UInt8 {
+            let cA   : UInt8 = 65
+            let c0   : UInt8 = 48
+            let corr : UInt8 = cA - c0 - 10
+            let c    = nibble + c0
+            let mask : UInt8 = (nibble > 9) ? 0xff : 0x00;
+            return c + (mask & corr)
+          }
+      
+          cstr[idx] = hexFromNibble((byte & 0b11110000) >> 4); idx += 1
+          cstr[idx] = hexFromNibble((byte & 0b00001111));      idx += 1
         }
-        
-        cstr[idx] = hexFromNibble((byte & 0b11110000) >> 4); idx += 1
-        cstr[idx] = hexFromNibble((byte & 0b00001111));      idx += 1
+        if idx == 0 {
+          let c0 : UInt8 = 48
+          cstr[idx] = c0; idx += 1
+        }
+        cstr[idx] = 13; idx += 1
+        cstr[idx] = 10; idx += 1
+        cstr[idx] = 0 // having a valid cstr in memory is well worth a byte
+    
+        let bbp = UnsafeRawBufferPointer(start: cstr, count: idx)
+        return DispatchData(bytesNoCopy: bbp, deallocator: .free)
       }
-      if idx == 0 {
-        let c0 : UInt8 = 48
-        cstr[idx] = c0; idx += 1
-      }
-      cstr[idx] = 13; idx += 1
-      cstr[idx] = 10; idx += 1
-      cstr[idx] = 0 // having a valid cstr in memory is well worth a byte
-      
-      let bbp = UnsafeRawBufferPointer(start: cstr, count: idx)
-      return DispatchData(bytesNoCopy: bbp, deallocator: .free)
     }
   }
-}
-
 #else // Swift 3 compat
   fileprivate extension Int {
     var bitWidth : Int {
@@ -471,44 +469,44 @@ fileprivate extension FixedWidthInteger {
       self.init(bytes: bp)
     }
   }
-
-fileprivate extension Int {
   
-  var chunkLenDispatchData : DispatchData {
-    // thanks go to @regexident
-    var bigEndian = self.bigEndian
+  fileprivate extension Int {
+
+    var chunkLenDispatchData : DispatchData {
+      // thanks go to @regexident
+      var bigEndian = self.bigEndian
+  
+      return try! Swift.withUnsafeBytes(of: &bigEndian) { bp in
+        let maxlen = bitWidth / 8 * 2
+        let cstr   = UnsafeMutablePointer<UInt8>.allocate(capacity: maxlen + 3)
+        var idx    = 0
     
-    return try! Swift.withUnsafeBytes(of: &bigEndian) { bp in
-      let maxlen = bitWidth / 8 * 2
-      let cstr   = UnsafeMutablePointer<UInt8>.allocate(capacity: maxlen + 3)
-      var idx    = 0
+        for byte in bp {
+          if idx == 0 && byte == 0 { continue }
       
-      for byte in bp {
-        if idx == 0 && byte == 0 { continue }
-        
-        func hexFromNibble(_ nibble: UInt8) -> UInt8 {
-          let cA   : UInt8 = 65
-          let c0   : UInt8 = 48
-          let corr : UInt8 = cA - c0 - 10
-          let c    = nibble + c0
-          let mask : UInt8 = (nibble > 9) ? 0xff : 0x00;
-          return c + (mask & corr)
+          func hexFromNibble(_ nibble: UInt8) -> UInt8 {
+            let cA   : UInt8 = 65
+            let c0   : UInt8 = 48
+            let corr : UInt8 = cA - c0 - 10
+            let c    = nibble + c0
+            let mask : UInt8 = (nibble > 9) ? 0xff : 0x00;
+            return c + (mask & corr)
+          }
+      
+          cstr[idx] = hexFromNibble((byte & 0b11110000) >> 4); idx += 1
+          cstr[idx] = hexFromNibble((byte & 0b00001111));      idx += 1
         }
-        
-        cstr[idx] = hexFromNibble((byte & 0b11110000) >> 4); idx += 1
-        cstr[idx] = hexFromNibble((byte & 0b00001111));      idx += 1
+        if idx == 0 {
+          let c0 : UInt8 = 48
+          cstr[idx] = c0; idx += 1
+        }
+        cstr[idx] = 13; idx += 1
+        cstr[idx] = 10; idx += 1
+        cstr[idx] = 0 // having a valid cstr in memory is well worth a byte
+    
+        let bbp = UnsafeRawBufferPointer(start: cstr, count: idx)
+        return DispatchData(bytesNoCopy: bbp, deallocator: .free)
       }
-      if idx == 0 {
-        let c0 : UInt8 = 48
-        cstr[idx] = c0; idx += 1
-      }
-      cstr[idx] = 13; idx += 1
-      cstr[idx] = 10; idx += 1
-      cstr[idx] = 0 // having a valid cstr in memory is well worth a byte
-      
-      let bbp = UnsafeRawBufferPointer(start: cstr, count: idx)
-      return DispatchData(bytesNoCopy: bbp, deallocator: .free)
     }
   }
-}
 #endif
