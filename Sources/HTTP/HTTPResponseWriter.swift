@@ -404,6 +404,7 @@ fileprivate extension DispatchData {
   
 }
 
+/*
 #if swift(>=4.0) // so much copying w/o macros ;->
   fileprivate extension Int { // could be FixedWidthInteger, no gain, X issues
 
@@ -445,6 +446,7 @@ fileprivate extension DispatchData {
     }
   }
 #else // Swift 3 compat
+*/
   fileprivate extension Int {
     var bitWidth : Int {
       return MemoryLayout<Int>.size * 8
@@ -509,4 +511,7 @@ fileprivate extension DispatchData {
       }
     }
   }
+  /*
 #endif
+*/
+  
